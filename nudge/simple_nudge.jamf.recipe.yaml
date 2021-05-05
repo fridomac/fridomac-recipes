@@ -1,0 +1,93 @@
+Description: Downloads the latest version and makes a pkg. Then, uploads the package and script to the Jamf Pro Server and creates a Self Service Policy and Smart Group.
+Identifier: com.gitlab.fridomac.jamf.nudge-simple
+ParentRecipe: com.github.erikng.download.Nudge
+MinimumVersion: 2.0.0
+
+Input:
+  NAME: Nudge
+  CATEGORY: Utilities
+  GROUP_NAME: "update-smart-%NAME%"
+  GROUP_TEMPLATE: SmartGroup-update-smart-regex_Nudge.xml
+  INSTALL_BUTTON_TEXT: Install
+  PRERELEASE: ""
+  POLICY_CATEGORY: Applications
+  POLICY_NAME: "Install Latest %NAME%"
+  INSTALL_POLICY_NAME: "Install Latest %NAME%"
+  INSTALL_POLICY_TEMPLATE: "Policy-install-latest_Nudge.xml"
+  INSTALL_POLICY_CATEGORY: "Applications"
+  REINSTALL_BUTTON_TEXT: "Install %version%"
+  SELF_SERVICE_DESCRIPTION: Nudge helps Users install their macOS updates in a timely manner.
+  SELF_SERVICE_DISPLAY_NAME: "Install Latest %NAME%"
+  SELF_SERVICE_ICON: "%NAME%.png"
+  DEPLOYMENT_GROUP_NAME: "macOS Version: 11/16.0"
+  SCRIPT_NAME: Nudge-Post-Install
+  SCRIPT_PATH: "%RECIPE_DIR%/Nudge_Postinstall.sh"
+  SCRIPT_PRIORITY: After
+  PARAMETER4_DESCRIPTION: "Authorization Key to prevent unauthorized execution via Jamf Remote"
+  PARAMETER4_VALUE: PurpleMonkeyDishwasher
+  PARAMETER5_DESCRIPTION: "Reverse Domain Name Notation for LaunchAgent"
+  PARAMETER5_VALUE: com.github.macadmins
+  PARAMETER6_DESCRIPTION: "Required Minimum OS Version (i.e., 11.2.3)"
+  PARAMETER6_VALUE: ""
+  PARAMETER7_DESCRIPTION: "Required Installation Date & Time (i.e., 2021-03-17T10:00:00Z)"
+  PARAMETER7_VALUE: ""
+  PARAMETER8_DESCRIPTION: "Configuration Files to Reset (i.e., None (blank) | All | JSON | LaunchAgent | LaunchDaemon)"
+  PARAMETER8_VALUE: ""
+  UPDATE_PREDICATE: pkg_uploaded == False
+  replace_group: "True"
+  replace_policy: "True"
+  replace_script: "True"
+
+Process:
+  - Processor: FlatPkgUnpacker
+    Arguments:
+      destination_path: "%RECIPE_CACHE_DIR%/unpack"
+      flat_pkg_path: "%pathname%"
+
+  - Processor: FileFinder
+    Arguments:
+      pattern: "%RECIPE_CACHE_DIR%/unpack/Nudge*.pkg"
+
+  - Processor: PkgPayloadUnpacker
+    Arguments:
+      destination_path: "%RECIPE_CACHE_DIR%/payload"
+      pkg_payload_path: "%found_filename%/Payload"
+
+  - Processor: Versioner
+    Arguments:
+      input_plist_path: "%RECIPE_CACHE_DIR%/payload/Applications/Utilities/Nudge.app/Contents/Info.plist"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfCategoryUploader
+    Arguments:
+      category_name: "%CATEGORY%"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfPackageUploader
+
+  - Processor: StopProcessingIf
+    Arguments:
+      predicate: "%UPDATE_PREDICATE%"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfScriptUploader
+    Arguments:
+      script_path: "%SCRIPT_PATH%"
+      script_name: "%SCRIPT_NAME%"
+      script_priority: "%SCRIPT_PRIORITY%"
+      script_parameter4: "%PARAMETER4_DESCRIPTION%"
+      script_parameter5: "%PARAMETER5_DESCRIPTION%"
+      script_parameter6: "%PARAMETER6_DESCRIPTION%"
+      script_parameter7: "%PARAMETER7_DESCRIPTION%"
+      script_parameter8: "%PARAMETER8_DESCRIPTION%"
+
+  - Processor: com.github.grahampugh.recipes.commonprocessors/VersionRegexGenerator
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfComputerGroupUploader
+    Arguments:
+      computergroup_name: "%GROUP_NAME%"
+      computergroup_template: "%GROUP_TEMPLATE%"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfPolicyUploader
+    Arguments:
+      icon: "%SELF_SERVICE_ICON%"
+      policy_name: "%INSTALL_POLICY_NAME%"
+      policy_template: "%INSTALL_POLICY_TEMPLATE%"
+      policy_category: "%INSTALL_POLICY_CATEGORY%"
