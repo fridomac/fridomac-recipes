@@ -29,7 +29,6 @@ Input:
   SCRIPT_NAME: Nudge-Post-Install
   SCRIPT_PRIORITY: After
   SCRIPT_CATEGORY: Utilities
-  
   PARAMETER4_VALUE: PurpleMonkeyDishwasher
   PARAMETER5_VALUE: com.github.macadmins
   PARAMETER6_VALUE: ""
