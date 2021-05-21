@@ -82,6 +82,8 @@ Process:
 
 # Upload the pkg
   - Processor: com.github.grahampugh.jamf-upload.processors/JamfPackageUploader
+    Arguments:
+      pkg_category: "%CATEGORY%"
 
 # Stop here if no Upload has taken place
   - Processor: StopProcessingIf
@@ -99,6 +101,7 @@ Process:
       script_parameter6: "%PARAMETER6_DESCRIPTION%"
       script_parameter7: "%PARAMETER7_DESCRIPTION%"
       script_parameter8: "%PARAMETER8_DESCRIPTION%"
+      script_category: "%CATEGORY%"
 
 # Generate a Version Regular Expression to create the smart Group
   - Processor: com.github.grahampugh.recipes.commonprocessors/VersionRegexGenerator
