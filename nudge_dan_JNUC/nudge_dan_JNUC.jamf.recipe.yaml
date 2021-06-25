@@ -1,0 +1,118 @@
+# First, add this repo with "autopkg repo-add https://github.com/fridomac/fridomac-recipes.git" 
+# Before that, be shure that you ran "autopkg repo-add erikng-recipes" and "autopkg repo-add grahampugh-recipes" beforehand (to get the Repos for the Nudge-Recipe and the Jamf-Upload-Processors)
+
+#Description fields and identifier:
+Description: Downloads the latest version and makes a pkg. Then, uploads the package and script to the Jamf Pro Server and creates a Self Service Policy and Smart Group.
+Identifier: com.gitlab.fridomac.jamf.nudge_dan_JNUC
+ParentRecipe: com.github.erikng.download.Nudge
+# Minimum Autopkg version
+MinimumVersion: 2.0.0
+
+Input:
+  NAME: Nudge
+  # Category for Package in Jamf
+  CATEGORY: Utilities
+  # Group Name for Update-Group (Have a look at the Template listed below)
+  GROUP_NAME: "update-smart-%NAME%"
+  GROUP_TEMPLATE: SmartGroup-update-smart-regex_Nudge.xml
+  INSTALL_BUTTON_TEXT: Install
+  PRERELEASE: ""
+  # Variables passed to the Processors below, can be found in the Template Files
+  POLICY_CATEGORY: Applications
+  POLICY_NAME: "Install Latest %NAME%"
+  INSTALL_POLICY_NAME: "Install Latest %NAME%"
+  INSTALL_POLICY_TEMPLATE: "Policy-install-latest_Nudge.xml"
+  INSTALL_POLICY_CATEGORY: "Applications"
+  REINSTALL_BUTTON_TEXT: "Install %version%"
+  SELF_SERVICE_DESCRIPTION: Nudge helps Users install their macOS updates in a timely manner.
+  SELF_SERVICE_DISPLAY_NAME: "Install Latest %NAME%"
+  SELF_SERVICE_ICON: "%NAME%.png"
+  # Group to scope the deployment to, see Template file
+  DEPLOYMENT_GROUP_NAME: "macOS Version: 11/16.0"
+  # Name of the Script File to upload and attach to the Policy
+  SCRIPT_NAME: Nudge-Post-Install
+  # Path to the script
+  SCRIPT_PATH: "%RECIPE_DIR%/Nudge_Postinstall.sh"
+  SCRIPT_PRIORITY: After
+  # Parameters and Descriptions of the Parameters
+  PARAMETER4_DESCRIPTION: "Authorization Key to prevent unauthorized execution via Jamf Remote"
+  PARAMETER4_VALUE: PurpleMonkeyDishwasher
+  PARAMETER5_DESCRIPTION: "Reverse Domain Name Notation for LaunchAgent"
+  PARAMETER5_VALUE: com.github.macadmins
+  PARAMETER6_DESCRIPTION: "Required Minimum OS Version (i.e., 11.2.3)"
+  PARAMETER6_VALUE: ""
+  PARAMETER7_DESCRIPTION: "Required Installation Date & Time (i.e., 2021-03-17T10:00:00Z)"
+  PARAMETER7_VALUE: ""
+  PARAMETER8_DESCRIPTION: "Configuration Files to Reset (i.e., None (blank) | All | JSON | LaunchAgent | LaunchDaemon)"
+  PARAMETER8_VALUE: ""
+  # Update only if the Package was changed
+  UPDATE_PREDICATE: pkg_uploaded == False
+  replace_group: "True"
+  replace_policy: "True"
+  replace_script: "True"
+
+# Work starts here (in which order AutoPkg will call the processors)
+Process:
+# unpack the pkg
+  - Processor: FlatPkgUnpacker
+    Arguments:
+      destination_path: "%RECIPE_CACHE_DIR%/unpack"
+      flat_pkg_path: "%pathname%"
+
+# find the Nudge.pkg File
+  - Processor: FileFinder
+    Arguments:
+      pattern: "%RECIPE_CACHE_DIR%/unpack/Nudge*.pkg"
+
+# unpack the Payload
+  - Processor: PkgPayloadUnpacker
+    Arguments:
+      destination_path: "%RECIPE_CACHE_DIR%/payload"
+      pkg_payload_path: "%found_filename%/Payload"
+
+# get the Version from Info.plist
+  - Processor: Versioner
+    Arguments:
+      input_plist_path: "%RECIPE_CACHE_DIR%/payload/Applications/Utilities/Nudge.app/Contents/Info.plist"
+
+# upload the Category
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfCategoryUploader
+    Arguments:
+      category_name: "%CATEGORY%"
+
+# Upload the pkg
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfPackageUploader
+
+# Stop here if no Upload has taken place
+  - Processor: StopProcessingIf
+    Arguments:
+      predicate: "%UPDATE_PREDICATE%"
+
+# upload the Script
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfScriptUploader
+    Arguments:
+      script_path: "%SCRIPT_PATH%"
+      script_name: "%SCRIPT_NAME%"
+      script_priority: "%SCRIPT_PRIORITY%"
+      script_parameter4: "%PARAMETER4_DESCRIPTION%"
+      script_parameter5: "%PARAMETER5_DESCRIPTION%"
+      script_parameter6: "%PARAMETER6_DESCRIPTION%"
+      script_parameter7: "%PARAMETER7_DESCRIPTION%"
+      script_parameter8: "%PARAMETER8_DESCRIPTION%"
+
+# Generate a Version Regular Expression to create the smart Group
+  - Processor: com.github.grahampugh.recipes.commonprocessors/VersionRegexGenerator
+
+# Upload the Group
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfComputerGroupUploader
+    Arguments:
+      computergroup_name: "%GROUP_NAME%"
+      computergroup_template: "%GROUP_TEMPLATE%"
+
+# Upload the Policy
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfPolicyUploader
+    Arguments:
+      icon: "%SELF_SERVICE_ICON%"
+      policy_name: "%INSTALL_POLICY_NAME%"
+      policy_template: "%INSTALL_POLICY_TEMPLATE%"
+      policy_category: "%INSTALL_POLICY_CATEGORY%"
